@@ -1,318 +1,354 @@
-# 🎭 Playwright
+# playwrightmcp-claude
 
-[![npm version](https://img.shields.io/npm/v/playwright.svg)](https://www.npmjs.com/package/playwright) <!-- GEN:chromium-version-badge -->[![Chromium version](https://img.shields.io/badge/chromium-154.0.8037.0-blue.svg?logo=google-chrome)](https://www.chromium.org/Home)<!-- GEN:stop --> <!-- GEN:firefox-version-badge -->[![Firefox version](https://img.shields.io/badge/firefox-156.0-blue.svg?logo=firefoxbrowser)](https://www.mozilla.org/en-US/firefox/new/)<!-- GEN:stop --> <!-- GEN:webkit-version-badge -->[![WebKit version](https://img.shields.io/badge/webkit-26.6-blue.svg?logo=safari)](https://webkit.org/)<!-- GEN:stop --> [![Join Discord](https://img.shields.io/badge/join-discord-informational)](https://aka.ms/playwright/discord)
+A working copy of the [Playwright](https://github.com/microsoft/playwright) monorepo (browser automation engine, test runner, and the **Playwright MCP server / CLI** for AI agents), set up for use with Claude Code.
 
-## [Documentation](https://playwright.dev) | [API reference](https://playwright.dev/docs/api/class-playwright)
+This guide covers:
 
-Playwright is a framework for web automation and testing. It drives Chromium, Firefox, and WebKit with a single API — in your tests, in your scripts, and as a tool for AI agents.
-
-## Get Started
-
-Choose the path that fits your workflow:
-
-| | Best for | Install |
-|---|---|---|
-| **[Playwright Test](#playwright-test)** | End-to-end testing | `npm init playwright@latest` |
-| **[Playwright CLI](#playwright-cli)** | Coding agents (Claude Code, Copilot) | `npm i -g @playwright/cli@latest` |
-| **[Playwright MCP](#playwright-mcp)** | AI agents and LLM-driven automation | `npx @playwright/mcp@latest` |
-| **[Playwright Library](#playwright-library)** | Browser automation scripts | `npm i playwright` |
-| **[VS Code Extension](#vs-code-extension)** | Test authoring and debugging in VS Code | [Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=ms-playwright.playwright) |
+1. [What is in this repository](#1-what-is-in-this-repository)
+2. [Prerequisites](#2-prerequisites)
+3. [Cloning the repository](#3-cloning-the-repository)
+4. [Installing and building](#4-installing-and-building)
+5. [Using the system](#5-using-the-system)
+   - [Run the MCP server from source](#51-run-the-mcp-server-from-source)
+   - [Connect it to Claude Code or another MCP client](#52-connect-it-to-claude-code-or-another-mcp-client)
+   - [Common MCP options](#53-common-mcp-options)
+   - [Use Playwright as a library or test runner](#54-use-playwright-as-a-library-or-test-runner)
+6. [Running the tests](#6-running-the-tests)
+7. [Daily development workflow](#7-daily-development-workflow)
+8. [Committing and pushing](#8-committing-and-pushing)
+9. [Troubleshooting](#9-troubleshooting)
+10. [Further reading](#10-further-reading)
 
 ---
 
-## Playwright Test
+## 1. What is in this repository
 
-Playwright Test is a full-featured test runner built for end-to-end testing. It runs tests across Chromium, Firefox, and WebKit with full browser isolation, auto-waiting, and web-first assertions.
+| Path | Purpose |
+|------|---------|
+| `packages/playwright-core` | Browser automation engine: client, server, protocol, MCP/CLI tools |
+| `packages/playwright` | Test runner and the public `playwright` package |
+| `packages/playwright-test` | `@playwright/test` entry point |
+| `packages/playwright-core/src/tools/` | MCP server (`mcp/`), tool implementations (`backend/`), CLI (`cli-client/`, `cli-daemon/`) |
+| `packages/trace-viewer`, `html-reporter`, `recorder`, `dashboard` | Web UIs |
+| `tests/` | All test suites (`page`, `library`, `playwright-test`, `mcp`, ...) |
+| `docs/src/` | API documentation, the source of truth for public TypeScript types |
+| `utils/` | Build scripts, code generation, linting |
+| `CLAUDE.md` | Project rules that Claude Code follows (commit format, test commands, ...) |
 
-### Install
+---
+
+## 2. Prerequisites
+
+| Tool | Version | Check with |
+|------|---------|-----------|
+| Git | any recent | `git --version` |
+| Node.js | **20 or newer** (required by `package.json`) | `node --version` |
+| npm | ships with Node.js | `npm --version` |
+| Disk space | a few GB (dependencies, build output, browser binaries) | |
+
+Optional:
+
+- [GitHub CLI](https://cli.github.com/) (`gh`) for pull requests.
+- [Claude Code](https://claude.com/claude-code) to use the repo with an AI agent.
+
+On Windows, use PowerShell or Git Bash. The commands below work in both unless noted.
+
+---
+
+## 3. Cloning the repository
+
+### 3.1 Clone your copy
 
 ```bash
-npm init playwright@latest
+git clone https://github.com/maharehanqsols-create/playwrightmcp-claude.git
+cd playwrightmcp-claude
 ```
 
-Or add manually:
+The history is large (thousands of upstream commits), so the first clone can take several minutes. If you only need the latest code and not the history:
 
 ```bash
-npm i -D @playwright/test
+git clone --depth 1 https://github.com/maharehanqsols-create/playwrightmcp-claude.git
+```
+
+A shallow clone cannot fetch older upstream history later without `git fetch --unshallow`.
+
+### 3.2 Check your git identity
+
+```bash
+git config user.name
+git config user.email
+```
+
+Set them if empty:
+
+```bash
+git config user.name "Your Name"
+git config user.email "you@example.com"
+```
+
+### 3.3 (Optional) Track the upstream Playwright repository
+
+This lets you pull in new upstream changes later.
+
+```bash
+git remote add upstream https://github.com/microsoft/playwright.git
+git remote -v
+```
+
+To bring upstream changes into your `main`:
+
+```bash
+git fetch upstream
+git merge upstream/main
+```
+
+Do not push to `upstream`. It is the Microsoft repository, and you almost certainly do not have write access.
+
+---
+
+## 4. Installing and building
+
+From the repository root:
+
+```bash
+npm ci
+npm run build
 npx playwright install
 ```
 
-### Write a test
+What each step does:
 
-```TypeScript
-import { test, expect } from '@playwright/test';
+1. `npm ci` installs the exact dependency versions from `package-lock.json` for all workspace packages.
+2. `npm run build` compiles all packages and generates derived files (types, protocol channels, validators).
+3. `npx playwright install` downloads the browser binaries (Chromium, Firefox, WebKit) that Playwright drives. To download only one browser: `npx playwright install chromium`.
 
-test('has title', async ({ page }) => {
-  await page.goto('https://playwright.dev/');
-  await expect(page).toHaveTitle(/Playwright/);
-});
-
-test('get started link', async ({ page }) => {
-  await page.goto('https://playwright.dev/');
-  await page.getByRole('link', { name: 'Get started' }).click();
-  await expect(page.getByRole('heading', { name: 'Installation' })).toBeVisible();
-});
-```
-
-### Run tests
+For active development, use watch mode instead of a one-off build:
 
 ```bash
-npx playwright test
+npm run watch
 ```
 
-Tests run in parallel across all configured browsers, in headless mode by default. Each test gets a fresh browser context — full isolation with near-zero overhead.
-
-### Key capabilities
-
-**Auto-wait and web-first assertions.** No artificial timeouts. Playwright waits for elements to be actionable, and assertions automatically retry until conditions are met.
-
-**Locators.** Find elements with resilient locators that mirror how users see the page:
-
-```TypeScript
-page.getByRole('button', { name: 'Submit' })
-page.getByLabel('Email')
-page.getByPlaceholder('Search...')
-page.getByTestId('login-form')
-```
-
-**Test isolation.** Each test runs in its own browser context — equivalent to a fresh browser profile. Save authentication state once and reuse it across tests:
-
-```TypeScript
-// Save state after login
-await page.context().storageState({ path: 'auth.json' });
-
-// Reuse in other tests
-test.use({ storageState: 'auth.json' });
-```
-
-**Tracing.** Capture execution traces, screenshots, and videos on failure. Inspect every action, DOM snapshot, network request, and console message in the [Trace Viewer](https://playwright.dev/docs/trace-viewer):
-
-```TypeScript
-// playwright.config.ts
-export default defineConfig({
-  use: {
-    trace: 'on-first-retry',
-  },
-});
-```
-
-```bash
-npx playwright show-trace trace.zip
-```
-
-<!-- TODO: screenshot of trace viewer -->
-
-**Parallelism.** Tests run in parallel by default across all configured browsers.
-
-[Full testing documentation](https://playwright.dev/docs/intro)
+Leave it running in its own terminal. It rebuilds on every change, and it also regenerates generated files, so do not hand-edit those.
 
 ---
 
-## Playwright CLI
+## 5. Using the system
 
-[Playwright CLI](https://github.com/microsoft/playwright-cli) is a command-line interface for browser automation designed for coding agents. It's more token-efficient than MCP — commands avoid loading large tool schemas and accessibility trees into the model context.
+### 5.1 Run the MCP server from source
 
-### Install
-
-```bash
-npm install -g @playwright/cli@latest
-```
-
-Optionally install skills for richer agent integration:
+After building, start the MCP server from your clone:
 
 ```bash
-playwright-cli install --skills
+node packages/playwright-core/cli.js mcp
 ```
 
-### Usage
-
-Point your coding agent at a task:
-
-```
-Test the "add todo" flow on https://demo.playwright.dev/todomvc using playwright-cli.
-Take screenshots for all successful and failing scenarios.
-```
-
-Or run commands directly:
+This runs the server over stdio, which is what MCP clients expect. For a standalone HTTP/SSE server on a port:
 
 ```bash
-playwright-cli open https://demo.playwright.dev/todomvc/ --headed
-playwright-cli type "Buy groceries"
-playwright-cli press Enter
-playwright-cli screenshot
+node packages/playwright-core/cli.js mcp --port 8931
 ```
 
-### Session monitoring
-
-Use `playwright-cli show` to open a visual dashboard with live screencast previews of all running browser sessions. Click any session to zoom in and take remote control.
+To see every option:
 
 ```bash
-playwright-cli show
+node packages/playwright-core/cli.js mcp --help
 ```
 
-<!-- TODO: screenshot of playwright-cli show dashboard -->
+### 5.2 Connect it to Claude Code or another MCP client
 
-[Full CLI documentation](https://playwright.dev/agent-cli/introduction) | [GitHub](https://github.com/microsoft/playwright-cli)
+**Claude Code, using your local build:**
 
----
+```bash
+claude mcp add playwright-local -- node /absolute/path/to/playwrightmcp-claude/packages/playwright-core/cli.js mcp
+```
 
-## Playwright MCP
+On Windows, use an absolute path such as `D:\path\to\playwrightmcp-claude\packages\playwright-core\cli.js`.
 
-The [Playwright MCP server](https://github.com/microsoft/playwright-mcp) gives AI agents full browser control through the [Model Context Protocol](https://modelcontextprotocol.io). Agents interact with pages using structured accessibility snapshots — no vision models or screenshots required.
+**Claude Code, using the published package instead of your build:**
 
-### Setup
+```bash
+claude mcp add playwright -- npx @playwright/mcp@latest
+```
 
-Add to your MCP client (VS Code, Cursor, Claude Desktop, Windsurf, etc.):
+**Other MCP clients (VS Code, Cursor, Claude Desktop, Windsurf, ...)** take a JSON entry like this:
 
 ```json
 {
   "mcpServers": {
     "playwright": {
-      "command": "npx",
-      "args": ["@playwright/mcp@latest"]
+      "command": "node",
+      "args": [
+        "/absolute/path/to/playwrightmcp-claude/packages/playwright-core/cli.js",
+        "mcp"
+      ]
     }
   }
 }
 ```
 
-**One-click install for VS Code:**
+Once connected, ask your agent to do browser work in plain language, for example:
 
-[<img src="https://img.shields.io/badge/VS_Code-VS_Code?style=flat-square&label=Install%20MCP%20Server&color=0098FF" alt="Install in VS Code" />](https://insiders.vscode.dev/redirect?url=vscode%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522playwright%2522%252C%2522command%2522%253A%2522npx%2522%252C%2522args%2522%253A%255B%2522%2540playwright%252Fmcp%2540latest%2522%255D%257D)
+- "Open https://example.com and tell me the page heading."
+- "Go to the login page, fill in the form, and take a screenshot."
+- "List all links on this page."
 
-**For Claude Code:**
+The agent reads pages through structured accessibility snapshots, so it does not need screenshots to understand a page. If you change the code, rebuild (or keep `npm run watch` running) and restart the MCP client so it picks up the new build.
 
-```bash
-claude mcp add playwright npx @playwright/mcp@latest
-```
+### 5.3 Common MCP options
 
-### How it works
+Pass these after `mcp` (in the `args` list for JSON configs).
 
-Ask your AI assistant to interact with any web page:
+| Option | Effect |
+|--------|--------|
+| `--headless` | Run the browser without a window (default is headed) |
+| `--browser <name>` | `chrome`, `firefox`, `webkit`, or `msedge` |
+| `--isolated` | Keep the browser profile in memory only, nothing saved to disk |
+| `--caps <list>` | Enable extra capabilities: `vision`, `pdf`, `devtools` |
+| `--device "iPhone 15"` | Emulate a device |
+| `--viewport-size` / `--mobile` | Control the viewport or emulate a generic mobile device |
+| `--port <port>` / `--host <host>` | Serve over HTTP instead of stdio |
+| `--config <path>` | Load options from a configuration file |
+| `--storage-state <path>` | Start with saved cookies/local storage (isolated sessions) |
+| `--cdp-endpoint <url>` | Attach to an already running Chromium via CDP |
+| `--extension` | Connect to a running Chrome/Edge through the Playwright extension |
+| `--output-dir <path>` | Where screenshots and other output files are written |
+| `--proxy-server <url>` | Route traffic through a proxy |
 
-```
-Navigate to https://demo.playwright.dev/todomvc and add a few todo items.
-```
-
-The agent sees the page as a structured accessibility tree:
-
-```
-- heading "todos" [level=1]
-- textbox "What needs to be done?" [ref=e5]
-- listitem:
-  - checkbox "Toggle Todo" [ref=e10]
-  - text: "Buy groceries"
-```
-
-It uses element refs like `e5` and `e10` to click, type, and interact — deterministically and without visual ambiguity. Tools cover navigation, form filling, screenshots, network mocking, storage management, and more.
-
-[Full MCP documentation](https://playwright.dev/mcp/introduction) | [GitHub](https://github.com/microsoft/playwright-mcp)
-
----
-
-## Playwright Library
-
-Use `playwright` as a library for browser automation scripts — web scraping, PDF generation, screenshot capture, and any workflow that needs programmatic browser control without a test runner.
-
-### Install
+Example (headless Firefox, in-memory profile):
 
 ```bash
-npm i playwright
+node packages/playwright-core/cli.js mcp --browser firefox --headless --isolated
 ```
 
-### Examples
+### 5.4 Use Playwright as a library or test runner
 
-**Take a screenshot:**
+You can also use the built packages directly.
 
-```TypeScript
-import { chromium } from 'playwright';
+**Library script** (`example.js`):
 
-const browser = await chromium.launch();
-const page = await browser.newPage();
-await page.goto('https://playwright.dev/');
-await page.screenshot({ path: 'screenshot.png' });
-await browser.close();
+```js
+const { chromium } = require('playwright-core');
+
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  await page.goto('https://example.com');
+  console.log(await page.title());
+  await browser.close();
+})();
 ```
 
-**Generate a PDF:**
+**Test runner:** create a `*.spec.ts` file and run it with the repo's runner:
 
-```TypeScript
-import { chromium } from 'playwright';
+```ts
+import { test, expect } from '@playwright/test';
 
-const browser = await chromium.launch();
-const page = await browser.newPage();
-await page.goto('https://playwright.dev/');
-await page.pdf({ path: 'page.pdf', format: 'A4' });
-await browser.close();
+test('has title', async ({ page }) => {
+  await page.goto('https://example.com');
+  await expect(page).toHaveTitle(/Example/);
+});
 ```
 
-**Emulate a mobile device:**
-
-```TypeScript
-import { chromium, devices } from 'playwright';
-
-const browser = await chromium.launch();
-const context = await browser.newContext(devices['iPhone 15']);
-const page = await context.newPage();
-await page.goto('https://playwright.dev/');
-await page.screenshot({ path: 'mobile.png' });
-await browser.close();
+```bash
+npx playwright test
+npx playwright test --headed
+npx playwright show-report
 ```
-
-**Intercept network requests:**
-
-```TypeScript
-import { chromium } from 'playwright';
-
-const browser = await chromium.launch();
-const page = await browser.newPage();
-await page.route('**/*.{png,jpg,jpeg}', route => route.abort());
-await page.goto('https://playwright.dev/');
-await browser.close();
-```
-
-[Library documentation](https://playwright.dev/docs/library) | [API reference](https://playwright.dev/docs/api/class-playwright)
 
 ---
 
-## VS Code Extension
+## 6. Running the tests
 
-The [Playwright VS Code extension](https://marketplace.visualstudio.com/items?itemName=ms-playwright.playwright) brings test running, debugging, and code generation directly into your editor.
+Run these from the repo root. Keep `npm run watch` running (or run `npm run build` first) so tests use up-to-date code.
 
-<!-- TODO: hero screenshot of VS Code with Playwright sidebar -->
+| Command | What it runs |
+|---------|--------------|
+| `npm run ctest <filter>` | Library tests, Chromium only (best during development) |
+| `npm run test <filter> -- --project=<chromium,firefox,webkit>` | Library tests for the chosen browsers |
+| `npm run ttest <filter>` | Test-runner tests (`tests/playwright-test/`) |
+| `npm run ctest-mcp <filter>` | MCP tool tests, Chromium only (`tests/mcp/`) |
+| `npm run test-mcp <filter> -- --project=<chromium,firefox,webkit>` | MCP tool tests per browser |
 
-**Run and debug tests** from the editor with a single click. Set breakpoints, inspect variables, and step through test execution with a live browser view.
+Filtering examples:
 
-**Generate tests with CodeGen.** Click "Record new" to open a browser — navigate and interact with your app while Playwright writes the test code for you.
-
-**Pick locators.** Hover over any element in the browser to see the best available locator, then click to copy it to your clipboard.
-
-**Trace Viewer integration.** Enable "Show Trace Viewer" in the sidebar to get a full execution trace after each test run — DOM snapshots, network requests, console logs, and screenshots at every step.
-
-[Install the extension](https://marketplace.visualstudio.com/items?itemName=ms-playwright.playwright) | [VS Code guide](https://playwright.dev/docs/getting-started-vscode)
+```bash
+npm run ctest tests/page/locator-click.spec.ts       # one file
+npm run ctest tests/page/locator-click.spec.ts:12    # one test by line
+npm run ctest -- --grep "should click"               # by test name
+npm run ctest-mcp snapshot                           # MCP tests whose file name contains "snapshot"
+```
 
 ---
 
-## Cross-Browser Support
+## 7. Daily development workflow
 
-|          | Linux | macOS | Windows |
-|   :---   | :---: | :---: | :---:   |
-| Chromium<sup>1</sup> <!-- GEN:chromium-version -->154.0.8037.0<!-- GEN:stop --> | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| WebKit <!-- GEN:webkit-version -->26.6<!-- GEN:stop --> | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Firefox <!-- GEN:firefox-version -->156.0<!-- GEN:stop --> | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+1. Update your copy: `git pull origin main`.
+2. Start watch mode: `npm run watch`.
+3. Create a branch for your change: `git checkout -b my-change` (use `fix-<issue-number>` when fixing an issue).
+4. Edit code. Public API changes start in `docs/src/` (see `.claude/skills/playwright-dev/api.md`); MCP tools live in `packages/playwright-core/src/tools/backend/` (see `.claude/skills/playwright-dev/tools.md`).
+5. Add or update tests and run them (section 6).
+6. Run the full lint and type check before committing:
 
-Headless and headed execution on all platforms. <sup>1</sup> Uses [Chrome for Testing](https://developer.chrome.com/blog/chrome-for-testing) by default.
+   ```bash
+   npm run flint
+   ```
 
-## Other Languages
+   Use `flint` rather than running `tsc` or eslint separately.
 
-Playwright is also available for [Python](https://playwright.dev/python/docs/intro), [.NET](https://playwright.dev/dotnet/docs/intro), and [Java](https://playwright.dev/java/docs/intro).
+Coding conventions and the import rules between packages (`DEPS.list` files) are described in [CLAUDE.md](CLAUDE.md).
 
-## Resources
+---
 
-* [Documentation](https://playwright.dev)
-* [API reference](https://playwright.dev/docs/api/class-playwright)
-* [MCP server](https://github.com/microsoft/playwright-mcp)
-* [CLI for coding agents](https://github.com/microsoft/playwright-cli)
-* [VS Code extension](https://github.com/microsoft/playwright-vscode)
-* [Contribution guide](CONTRIBUTING.md)
-* [Changelog](https://github.com/microsoft/playwright/releases)
-* [Discord](https://aka.ms/playwright/discord)
+## 8. Committing and pushing
+
+Use semantic commit messages in the form `label(scope): description`, where the label is one of `fix`, `feat`, `chore`, `docs`, `test`, `devops`:
+
+```bash
+git add <changed-files>
+git commit -m "fix(proxy): handle SOCKS proxy authentication"
+```
+
+Create new commits for follow-up changes rather than amending existing ones.
+
+Push to **your** repository:
+
+```bash
+git push origin main
+```
+
+If you cloned from `https://github.com/maharehanqsols-create/playwrightmcp-claude.git`, then `origin` is your repo and this is the correct target. Check with `git remote -v`.
+
+If `git push` is rejected with "fetch first", the remote has commits you do not have. Run `git pull` (or `git fetch` and `git merge origin/main`), resolve any conflicts, and push again. Avoid `git push --force` unless you are certain you want to overwrite the remote history.
+
+---
+
+## 9. Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `npm ci` fails with an engine or version error | Install Node.js 20 or newer and retry |
+| Tests or the MCP server say a browser is missing | Run `npx playwright install` |
+| Changes do not show up | Make sure `npm run watch` is running, or re-run `npm run build`; restart the MCP client |
+| `cli.js` not found when starting the MCP server | The build has not run yet; run `npm run build` |
+| Generated files keep reverting | They are generated by the build; edit the source (for example `docs/src/` or `protocol.yml`) instead |
+| `flint` reports import violations | Update the relevant `DEPS.list` to declare the allowed import |
+| First clone is very slow | Use `git clone --depth 1` |
+| Windows path problems in MCP client config | Use absolute paths, and escape backslashes in JSON (`D:\\path\\to\\...`) |
+| Push rejected with "fetch first" | See section 8 |
+
+---
+
+## 10. Further reading
+
+- Playwright documentation: https://playwright.dev
+- Playwright MCP server: https://github.com/microsoft/playwright-mcp
+- Model Context Protocol: https://modelcontextprotocol.io
+- Upstream contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Project rules for Claude Code: [CLAUDE.md](CLAUDE.md)
+- Architecture and development guides: `.claude/skills/playwright-dev/`
+
+The original upstream Playwright README is preserved in git history (`git show bd1abdfaa:README.md`).
+
+## License
+
+Apache 2.0, the same as upstream Playwright. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
